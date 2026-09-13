@@ -106,7 +106,7 @@ int main(int argc, char **argv)
     if (afd == NULL)
     {
         char *lines[] = {
-            "Welcome to the new (beta) Retro Rewind Channel!",
+            "Welcome to the (beta) VanzaKart Channel!",
             "",
             "You will now be taken to the settings menu.",
             "Please make sure your settings are the same",

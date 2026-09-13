@@ -38,7 +38,7 @@
 #include "../versionutils.h"
 #include "../sd.h"
 
-#define _RRC_UPDATE_ZIP_NAME "rr.update.zip"
+#define _RRC_UPDATE_ZIP_NAME "vk.update.zip"
 
 struct rrc_result rrc_update_get_current_version(struct rrc_version *version)
 {

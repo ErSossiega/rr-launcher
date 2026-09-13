@@ -16,7 +16,7 @@ jobs:
         id: toolchain-cache
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-docker-${{ hashFiles('install-libs.sh') }}
+          key: ${{ runner.os }}-docker-${{ hashFiles('install-libs.sh', '.github/docker/Dockerfile') }}
 
       - name: Prepare docker image
         run: |
@@ -34,4 +34,11 @@ jobs:
           docker run --rm -i -d -v $(pwd)/:/rr -w /rr --name retrorewind-ci retrorewind bash
           docker exec retrorewind-ci make clean
           docker exec retrorewind-ci make
+          docker exec retrorewind-ci make release
           docker stop retrorewind-ci
+
+      - name: Upload channel files
+        uses: actions/upload-artifact@v4
+        with:
+          name: vanzakart-launcher
+          path: build/release

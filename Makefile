@@ -132,10 +132,10 @@ debug: $(BUILD) debug-package
 
 debug-package:
 	# Move files to a debug staging directory instead of the release directory
-	mkdir -p $(BUILD)/debug/RetroRewindChannel
-	mkdir -p $(BUILD)/debug/apps/RetroRewind
-	cp runtime-ext/runtime-ext-* $(BUILD)/debug/RetroRewindChannel
-	cp $(OUTPUT).dol $(BUILD)/debug/apps/RetroRewind/boot.dol
+	mkdir -p $(BUILD)/debug/VanzaKartChannel
+	mkdir -p $(BUILD)/debug/apps/VanzaKart
+	cp runtime-ext/runtime-ext-* $(BUILD)/debug/VanzaKartChannel
+	cp $(OUTPUT).dol $(BUILD)/debug/apps/VanzaKart/boot.dol
 
 beta: EXTRA_CFLAGS := -DRRC_BETA=1
 beta: export EXTRA_CFLAGS := -DRRC_BETA=1
@@ -143,10 +143,10 @@ beta: $(BUILD) beta-package
 
 beta-package:
 	# Move files to a beta staging directory instead of the release directory
-	mkdir -p $(BUILD)/beta/RetroRewindChannelBeta
-	mkdir -p $(BUILD)/beta/apps/RetroRewindBeta
-	cp runtime-ext/runtime-ext-* $(BUILD)/beta/RetroRewindChannelBeta
-	cp $(OUTPUT).dol $(BUILD)/beta/apps/RetroRewindBeta/boot.dol
+	mkdir -p $(BUILD)/beta/VanzaKartChannelBeta
+	mkdir -p $(BUILD)/beta/apps/VanzaKartBeta
+	cp runtime-ext/runtime-ext-* $(BUILD)/beta/VanzaKartChannelBeta
+	cp $(OUTPUT).dol $(BUILD)/beta/apps/VanzaKartBeta/boot.dol
 
 clean:
 	@echo clean ...
@@ -158,10 +158,10 @@ run:
 
 release: $(BUILD)
 	# Move files to correct places
-	mkdir -p $(RELEASE)/RetroRewindChannel
-	mkdir -p $(RELEASE)/apps/RetroRewind
-	cp runtime-ext/runtime-ext-* $(RELEASE)/RetroRewindChannel 
-	cp $(OUTPUT).dol $(RELEASE)/apps/RetroRewind/boot.dol
+	mkdir -p $(RELEASE)/VanzaKartChannel
+	mkdir -p $(RELEASE)/apps/VanzaKart
+	cp runtime-ext/runtime-ext-* $(RELEASE)/VanzaKartChannel 
+	cp $(OUTPUT).dol $(RELEASE)/apps/VanzaKart/boot.dol
 	cp assets/THIRD_PARTY_NOTICES.txt $(RELEASE)/THIRD_PARTY_NOTICES.txt
 
 #---------------------------------------------------------------------------------

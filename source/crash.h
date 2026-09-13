@@ -24,12 +24,12 @@
 
 // Do not use the channel base dir constant here, as the game is unaware of this.
 // It will always write into the "main" folder. Since it's an ephemeral file, it doesn't really matter.
-#define RRC_CRASH_FILE_PATH "/RetroRewindChannel/.crash"
+#define RRC_CRASH_FILE_PATH "/VanzaKartChannel/.crash"
 
 /* 
     Run the post-crash handler.
     Prompts the user about the crash and asks them if they want to upload
-    RetroRewind6/Crash.pul to the servers (if any such file exists).
+    VanzaKart/Crash.pul to the servers (if any such file exists).
     Then clears the flag and returns.
 */
 void rrc_crash_handle(void *xfb, struct rrc_settingsfile *settings);

@@ -164,8 +164,8 @@ void rrc_loader_load(struct rrc_dol *dol, struct rrc_settingsfile *settings, voi
         struct rrc_result err = rrc_result_create_error_version_mismatch("runtime-ext version does not match channel\n"
                                                                          "version!\n\n"
                                                                          "Consider manually updating the channel at this time,\n"
-                                                                         "or join our discord if you need further help:\n"
-                                                                         "https://discord.gg/retrorewind");
+                                                                         "or contact the VanzaKart team for help:\n"
+                                                                         "https://vanzakart.net");
         rrc_result_error_check_error_fatal(err);
         return;
     }

@@ -62,7 +62,7 @@ struct rrc_result rrc_update_get_current_version(struct rrc_version *version);
 struct rrc_result rrc_update_set_current_version(struct rrc_version *version);
 
 /*
-    Downloads a Retro Rewind ZIP. Uses the console to display progress.
+    Downloads a VanzaKart update ZIP. Uses the console to display progress.
     Stores on SD in the file given by `filename'.
 */
 struct rrc_result rrc_update_download_zip(char *url, char *filename, int current_zip, int max_zips);

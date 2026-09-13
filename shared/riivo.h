@@ -23,7 +23,7 @@
 #include <dir.h>
 #include "types.h"
 
-#define RRC_RIIVO_XML_PATH "/" RRC_RETRO_REWIND_BASE_DIR "/xml/" RRC_RETRO_REWIND_BASE_DIR ".xml"
+#define RRC_RIIVO_XML_PATH "/riivolution/" RRC_RETRO_REWIND_BASE_DIR ".xml"
 
 struct rrc_riivo_sd_file
 {

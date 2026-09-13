@@ -29,8 +29,8 @@
 void rrc_crash_handle(void *xfb, struct rrc_settingsfile *settings)
 {
     char *lines[] = {
-        "- - - Retro Rewind crashed! - - -",
-        "---------------------------------",
+        "- - - VanzaKart crashed! - - -",
+        "------------------------------",
         "This could have been caused by faulty My Stuff",
         "files, online cheaters, a bug in the pack,",
         "or a corrupted installation.",
@@ -42,8 +42,8 @@ void rrc_crash_handle(void *xfb, struct rrc_settingsfile *settings)
     if (my_stuff_enabled)
     {
         char *lines2[] = {
-            "- - - Retro Rewind crashed! - - -",
-            "---------------------------------",
+            "- - - VanzaKart crashed! - - -",
+            "------------------------------",
             "It appears that you have My Stuff enabled.",
             "Before reporting the crash, please try disabling it",
             "and seeing if the crash still occurs."
@@ -53,17 +53,17 @@ void rrc_crash_handle(void *xfb, struct rrc_settingsfile *settings)
     else
     {
         char *lines2[] = {
-            "- - - Retro Rewind crashed! - - -",
-            "---------------------------------",
+            "- - - VanzaKart crashed! - - -",
+            "------------------------------",
             "If the crash is consistent, try reinstalling",
-            "Retro Rewind. Make sure to precisely follow the",
-            "instructions found on https://rwfc.net/downloads,",
+            "VanzaKart. Make sure to precisely follow the",
+            "instructions found on https://vanzakart.net,",
             "and do not manually delete any files.",
             "",
             "A crash file was written to sd:/" RRC_RETRO_REWIND_BASE_DIR "/Crash.pul.",
             "If you continue to experience issues, please report it",
-            "along with this file to our Discord server:",
-            "https://discord.gg/retrorewind",
+            "along with this file to the VanzaKart team:",
+            "https://vanzakart.net",
         };
         rrc_prompt_1_option(xfb, lines2, 11, "OK");
     }
