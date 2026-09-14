@@ -26,8 +26,8 @@
 #include "../util.h"
 #include "versionsfile.h"
 
-#define _RRC_VERSIONSFILE_URL "http://api.vanzakart.net:8000/VanzaKart/VanzaKartVersion.txt"
-#define _RRC_VERSIONS_FILE_REMOVED_URL "http://api.vanzakart.net:8000/VanzaKart/VanzaKartDelete.txt"
+#define _RRC_VERSIONSFILE_URL "http://vanzakart.net:8000/VanzaKart/VanzaKartVersion.txt"
+#define _RRC_VERSIONS_FILE_REMOVED_URL "http://vanzakart.net:8000/VanzaKart/VanzaKartDelete.txt"
 // max array size
 #define _RRC_SPLIT_LIM 4096
 
