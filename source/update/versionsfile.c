@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -90,6 +91,7 @@ int rrc_versionsfile_get_versionsfile(char **result)
     if (curl)
     {
         curl_easy_setopt(curl, CURLOPT_URL, _RRC_VERSIONSFILE_URL);
+        curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
         curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, _rrc_versionsfile_progress_callback);
@@ -137,6 +139,7 @@ int rrc_versionsfile_get_removed_files(char **result)
     if (curl)
     {
         curl_easy_setopt(curl, CURLOPT_URL, _RRC_VERSIONS_FILE_REMOVED_URL);
+        curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
         curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, _rrc_versionsfile_progress_callback);
@@ -162,6 +165,18 @@ int rrc_versionsfile_get_removed_files(char **result)
 
     *result = s.ptr;
     return 0;
+}
+
+/*
+    Prepares one line of a versions file for splitting: drops a trailing CR (files saved with
+    Windows line endings) and reports whether anything is left.
+*/
+static bool _rrc_versionsfile_clean_line(char *line)
+{
+    int len = strlen(line);
+    while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == ' '))
+        line[--len] = '\0';
+    return len > 0;
 }
 
 int rrc_versionsfile_split_by(char *in, char by, char ***out, int *amt)
@@ -261,9 +276,12 @@ struct rrc_result rrc_versionsfile_get_necessary_urls_and_versions(char *version
     for (int i = 0; i < count; i++)
     {
         char *line = lines[i];
+        if (!_rrc_versionsfile_clean_line(line))
+            continue;
+
         char **parts;
         /* this is only here if we fail to parse it all and need to free this amount */
-        int num_parts;
+        int num_parts = 0;
         int res = rrc_versionsfile_split_by(line, ' ', &parts, &num_parts);
         /* dont bother checking for 2 because it really should never ever happen */
 
@@ -271,6 +289,14 @@ struct rrc_result rrc_versionsfile_get_necessary_urls_and_versions(char *version
         {
             rrc_versionsfile_free_split(lines, count);
             return rrc_result_create_error_corrupted_versionfile("Failed to split versionfile");
+        }
+
+        /* every entry is "version url": anything else means the file is not what we expect */
+        if (num_parts < 2)
+        {
+            rrc_versionsfile_free_split(parts, num_parts);
+            rrc_versionsfile_free_split(lines, count);
+            return rrc_result_create_error_corrupted_versionfile("Versionfile line is not \"version url\"");
         }
 
         struct rrc_version verint;
@@ -329,12 +355,23 @@ struct rrc_result rrc_versionsfile_parse_deleted_files(char *input, struct rrc_v
 
     for (int i = 0; i < count; i++)
     {
+        if (!_rrc_versionsfile_clean_line(lines[i]))
+            continue;
+
         char **parts;
-        int parts_count;
+        int parts_count = 0;
         res = rrc_versionsfile_split_by(lines[i], ' ', &parts, &parts_count);
         if (res < 0)
         {
             return rrc_result_create_error_corrupted_versionfile("Failed to split deleted versionfile");
+        }
+
+        /* every entry is "version path" */
+        if (parts_count < 2)
+        {
+            rrc_versionsfile_free_split(parts, parts_count);
+            rrc_versionsfile_free_split(lines, count);
+            return rrc_result_create_error_corrupted_versionfile("Deleted versionfile line is not \"version path\"");
         }
 
         struct rrc_version verint;
