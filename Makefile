@@ -136,6 +136,7 @@ debug-package:
 	mkdir -p $(BUILD)/debug/apps/VanzaKart
 	cp runtime-ext/runtime-ext-* $(BUILD)/debug/VanzaKartChannel
 	cp $(OUTPUT).dol $(BUILD)/debug/apps/VanzaKart/boot.dol
+	cp assets/hbc/icon.png assets/hbc/meta.xml $(BUILD)/debug/apps/VanzaKart/
 
 beta: EXTRA_CFLAGS := -DRRC_BETA=1
 beta: export EXTRA_CFLAGS := -DRRC_BETA=1
@@ -147,6 +148,7 @@ beta-package:
 	mkdir -p $(BUILD)/beta/apps/VanzaKartBeta
 	cp runtime-ext/runtime-ext-* $(BUILD)/beta/VanzaKartChannelBeta
 	cp $(OUTPUT).dol $(BUILD)/beta/apps/VanzaKartBeta/boot.dol
+	cp assets/hbc/icon.png assets/hbc/meta.xml $(BUILD)/beta/apps/VanzaKartBeta/
 
 clean:
 	@echo clean ...
@@ -162,6 +164,7 @@ release: $(BUILD)
 	mkdir -p $(RELEASE)/apps/VanzaKart
 	cp runtime-ext/runtime-ext-* $(RELEASE)/VanzaKartChannel 
 	cp $(OUTPUT).dol $(RELEASE)/apps/VanzaKart/boot.dol
+	cp assets/hbc/icon.png assets/hbc/meta.xml $(RELEASE)/apps/VanzaKart/
 	cp assets/THIRD_PARTY_NOTICES.txt $(RELEASE)/THIRD_PARTY_NOTICES.txt
 
 #---------------------------------------------------------------------------------
