@@ -98,9 +98,9 @@ void rrc_con_display_version()
     char vertext[32];
 
 #if defined(RRC_BETA) && RRC_BETA >= 1
-    snprintf(vertext, 32, "RR: %i.%i.%i (RRBETA BUILD)", cached_version.major, cached_version.minor, cached_version.patch);
+    snprintf(vertext, 32, "VK: %i.%i.%i (VKBETA BUILD)", cached_version.major, cached_version.minor, cached_version.patch);
 #else
-    snprintf(vertext, 32, "RR: %i.%i.%i", cached_version.major, cached_version.minor, cached_version.patch);
+    snprintf(vertext, 32, "VK: %i.%i.%i", cached_version.major, cached_version.minor, cached_version.patch);
 #endif
 
     char internal_vertext[32];
