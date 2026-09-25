@@ -119,6 +119,13 @@ struct rrc_result rrc_result_create_error_channel(const char *context)
     return res;
 }
 
+struct rrc_result rrc_result_create_error_news(const char *context)
+{
+    union rrc_result_error_inner einner = {0};
+    struct rrc_result res = {.err = alloc_error(ESOURCE_NEWS, einner, context)};
+    return res;
+}
+
 char *rrc_result_strerror(struct rrc_result result)
 {
     if (!rrc_result_is_error(result))
@@ -166,6 +173,8 @@ char *rrc_result_strerror(struct rrc_result result)
         return "Ghost download failed.";
     case ESOURCE_CHANNEL:
         return "Channel management failed.";
+    case ESOURCE_NEWS:
+        return "Could not load the news.";
     default:
         return NULL;
     }

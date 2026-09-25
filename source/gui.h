@@ -44,6 +44,22 @@
 #include <gccore.h>
 
 /*
+    The black box of the banner artwork (data/banner4_3 and data/banner16_9) in framebuffer coordinates,
+    the same in both banners. It covers the whole console area; the menu and the news reader are drawn in it.
+    X and W are even: each framebuffer word holds two pixels.
+*/
+#define RRC_GUI_BOX_X 68
+#define RRC_GUI_BOX_Y 110
+#define RRC_GUI_BOX_W 506
+#define RRC_GUI_BOX_H 300
+
+/*
+    In 16:9 the TV stretches the framebuffer horizontally, so content for the box is drawn this much wider
+    (at the proportions it will actually have on screen) and squeezed into RRC_GUI_BOX_W when presented.
+*/
+#define RRC_GUI_BOX_W_WIDESCREEN ((RRC_GUI_BOX_W * 4 / 3) & ~1)
+
+/*
     Initialises the main GUI.
 
     The GUI is comprised of two parts: a console, and a banner artwork which surrounds it.

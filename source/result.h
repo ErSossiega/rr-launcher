@@ -49,7 +49,9 @@ enum rrc_result_error_source
     /* Failure while downloading ghosts */
     ESOURCE_GHOSTS,
     /* Failure while installing or removing the launcher channel */
-    ESOURCE_CHANNEL
+    ESOURCE_CHANNEL,
+    /* Failure while loading the news feed */
+    ESOURCE_NEWS
 };
 
 /* Because each library uses their own set of error codes, we need to support all
@@ -143,6 +145,8 @@ struct rrc_result rrc_result_create_error_version_mismatch(const char *context);
 struct rrc_result rrc_result_create_error_ghosts(const char *context);
 
 struct rrc_result rrc_result_create_error_channel(const char *context);
+
+struct rrc_result rrc_result_create_error_news(const char *context);
 
 /* Returns true if this result is an error, false otherwise. */
 inline bool rrc_result_is_error(struct rrc_result result)

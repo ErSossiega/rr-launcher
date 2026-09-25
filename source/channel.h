@@ -26,10 +26,10 @@
 /*
     Title ID of the launcher channel (WAD): 00010001 (downloaded channel) followed by the 4 character ID.
 
-    TODO: placeholder ("VKLC"), there is no WAD yet. It must match the title ID the WAD is built with,
-    otherwise the channel is never detected as installed.
+    "VKW1", as set in the channel WAD (forwarder) built with CustomizeMii. It must match the title ID the WAD is
+    built with, otherwise the channel is never detected as installed.
 */
-#define RRC_CHANNEL_TITLE_ID 0x00010001564B4C43ULL
+#define RRC_CHANNEL_TITLE_ID 0x00010001564B5731ULL
 
 /*
     Returns true if the launcher channel is installed on the console (or Dolphin's emulated NAND).

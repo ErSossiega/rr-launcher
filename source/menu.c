@@ -35,22 +35,16 @@
 #include "util.h"
 #include "update/update.h"
 #include "ghosts/ghosts.h"
+#include "news/news.h"
+#include "news/news_view.h"
 #include "version.h"
 
-/*
-    The menu is drawn over the black box of the banner artwork (see data/banner4_3 and data/banner16_9),
-    which also covers the whole console area. These are framebuffer coordinates, the same in 4:3 and 16:9.
-    MENU_X and MENU_W must be even: each framebuffer word holds two pixels.
-
-    In 16:9 the TV stretches the framebuffer horizontally, so the menu is drawn on a canvas 4/3 wider
-    (at the proportions it will actually have on screen) and squeezed into MENU_W when presented.
-*/
-#define MENU_X 68
-#define MENU_Y 110
-#define MENU_W 506
-#define MENU_H 300
-
-#define MENU_W_WIDESCREEN ((MENU_W * 4 / 3) & ~1)
+/* The menu fills the black box of the banner, see gui.h. */
+#define MENU_X RRC_GUI_BOX_X
+#define MENU_Y RRC_GUI_BOX_Y
+#define MENU_W RRC_GUI_BOX_W
+#define MENU_H RRC_GUI_BOX_H
+#define MENU_W_WIDESCREEN RRC_GUI_BOX_W_WIDESCREEN
 
 #define MENU_PAD 10
 #define MENU_GAP 12
@@ -94,6 +88,7 @@ enum menu_action
     MENU_ACTION_REMOVE_CHANNEL,
     MENU_ACTION_SETTINGS,
     MENU_ACTION_GHOSTS,
+    MENU_ACTION_NEWS,
     /* Placeholder slot for a future feature; drawn greyed out. */
     MENU_ACTION_NONE
 };
@@ -125,7 +120,7 @@ static const struct menu_tile menu_tiles[] = {
     {.label = "Install Channel", .image = tile_install_channel, .action = MENU_ACTION_INSTALL_CHANNEL},
     {.label = "Settings", .image = tile_settings, .action = MENU_ACTION_SETTINGS},
     {.label = "Ghosts", .image = tile_ghosts, .action = MENU_ACTION_GHOSTS},
-    {.label = "Coming Soon", .action = MENU_ACTION_NONE},
+    {.label = "News", .action = MENU_ACTION_NEWS},
 };
 
 /* Takes the place of the "Install Channel" tile while the channel is installed. */
@@ -411,6 +406,27 @@ static void run_ghosts(struct menu_state *st, void *xfb)
     }
 }
 
+static void run_news(struct menu_state *st, void *xfb)
+{
+    clear_menu(st, xfb);
+
+    struct rrc_news news;
+    struct rrc_result res = rrc_news_fetch(&news);
+    if (rrc_result_is_error(res))
+    {
+        rrc_result_error_check_error_normal(res, xfb);
+        set_error_status(st, "Could not load the news.");
+        return;
+    }
+
+    if (news.count == 0)
+        set_status(st, "No news right now.");
+    else
+        rrc_news_view_display(xfb, &news);
+
+    rrc_news_free(&news);
+}
+
 /* Loads the artwork of tile `i', resized to the tile. Without artwork the tile is drawn as an empty slot. */
 static void load_tile_image(struct menu_state *st, int i)
 {
@@ -582,6 +598,10 @@ enum rrc_menu_result rrc_menu_display(void *xfb, struct rrc_settingsfile *stored
 
             case MENU_ACTION_GHOSTS:
                 run_ghosts(&st, xfb);
+                break;
+
+            case MENU_ACTION_NEWS:
+                run_news(&st, xfb);
                 break;
 
             case MENU_ACTION_INSTALL_CHANNEL:
