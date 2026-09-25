@@ -17,6 +17,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -192,6 +193,13 @@ struct rrc_result rrc_tt_fetch_leaderboard(int track_id, struct rrc_tt_leaderboa
         struct rrc_tt_entry *e = &leaderboard->entries[leaderboard->count];
         e->rank = (int)rrc_json_get_number(item, "rank", leaderboard->count + 1);
         e->player = copy_text(item, "playerName", "?");
+
+        const char *country = rrc_json_get_string(item, "countryAlpha2");
+        if (country != NULL && isalpha((unsigned char)country[0]) && isalpha((unsigned char)country[1]) && country[2] == '\0')
+        {
+            e->country[0] = toupper((unsigned char)country[0]);
+            e->country[1] = toupper((unsigned char)country[1]);
+        }
         e->character = (int)rrc_json_get_number(item, "characterId", -1);
         e->vehicle = (int)rrc_json_get_number(item, "vehicleId", -1);
         e->time = copy_text(item, "finishTimeDisplay", "?");

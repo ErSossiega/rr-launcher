@@ -40,9 +40,11 @@
 
 /* Leaderboard columns, in characters. The player column takes what is left, within these bounds. */
 #define COL_RANK_W 3
+#define COL_COUNTRY_W 2
 #define COL_CHARACTER_W 12
 #define COL_VEHICLE_W 16
-#define COL_TIME_W 9
+/* "m:ss.mmm" */
+#define COL_TIME_W 8
 #define COL_FLAGS_W 2
 #define COL_PLAYER_MIN_W 8
 #define COL_PLAYER_MAX_W 20
@@ -56,6 +58,7 @@
 #define COLOR_RULE RRC_GFX_RGBA(80, 80, 95, 255)
 #define COLOR_GLITCH RRC_GFX_RGBA(255, 140, 80, 255)
 #define COLOR_SHROOMLESS RRC_GFX_RGBA(130, 220, 120, 255)
+#define COLOR_COUNTRY RRC_GFX_RGBA(120, 200, 255, 255)
 
 /* Code page 437 arrows, used as scroll indicators. */
 #define GLYPH_UP "\x18"
@@ -169,9 +172,10 @@ static int clamp(int v, int lo, int hi)
 
 static void show_leaderboard(struct view *v, void *xfb, const struct rrc_tt_track *track, const struct rrc_tt_leaderboard *lb)
 {
-    int player_w = clamp(v->cols - (COL_RANK_W + COL_CHARACTER_W + COL_VEHICLE_W + COL_TIME_W + COL_FLAGS_W + 5),
+    int player_w = clamp(v->cols - (COL_RANK_W + COL_COUNTRY_W + COL_CHARACTER_W + COL_VEHICLE_W + COL_TIME_W + COL_FLAGS_W + 6),
                          COL_PLAYER_MIN_W, COL_PLAYER_MAX_W);
-    int col_player = COL_RANK_W + 1;
+    int col_country = COL_RANK_W + 1;
+    int col_player = col_country + COL_COUNTRY_W + 1;
     int col_character = col_player + player_w + 1;
     int col_vehicle = col_character + COL_CHARACTER_W + 1;
     int col_time = col_vehicle + COL_VEHICLE_W + 1;
@@ -228,6 +232,8 @@ static void show_leaderboard(struct view *v, void *xfb, const struct rrc_tt_trac
 
                     snprintf(buf, sizeof(buf), "%3d", e->rank);
                     draw_text(v, 0, y, buf, COLOR_DIM);
+
+                    draw_text(v, col_country, y, e->country, COLOR_COUNTRY);
 
                     fit(buf, e->player, player_w);
                     draw_text(v, col_player, y, buf, COLOR_SELECTED_TEXT);

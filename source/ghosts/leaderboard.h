@@ -52,6 +52,8 @@ struct rrc_tt_entry
     int rank;
     /* Name of the player's time trial profile. */
     char *player;
+    /* ISO 3166 two-letter country code of the profile (e.g. "IT"), or empty if it has none. */
+    char country[3];
     int character;
     int vehicle;
     /* e.g. "1:23.456" */
