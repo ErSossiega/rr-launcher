@@ -47,6 +47,12 @@ struct pad_state
  */
 struct pad_state rrc_pad_buttons();
 
+/**
+ * Buttons currently held down on all controllers, as of the last `rrc_pad_buttons' call (which
+ * scans the controllers). The `rrc_pad_*_pressed' helpers work on this state too.
+ */
+struct pad_state rrc_pad_held();
+
 inline bool rrc_pad_a_pressed(struct pad_state state)
 {
     return (state.wpad & RRC_WPAD_A_MASK) || (state.gc & PAD_BUTTON_A);

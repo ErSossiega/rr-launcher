@@ -1,5 +1,5 @@
 /*
-    pad.c - Unified gamepad/wiimote implementation
+    leaderboard_view.h - time trial leaderboard screens
 
     Copyright (C) 2025  Retro Rewind Team
 
@@ -17,25 +17,15 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "pad.h"
-#include <gctypes.h>
-#include <wiiuse/wpad.h>
-#include <ogc/pad.h>
+#ifndef RRC_LEADERBOARD_VIEW_H
+#define RRC_LEADERBOARD_VIEW_H
 
-struct pad_state rrc_pad_buttons()
-{
-    WPAD_ScanPads();
-    PAD_ScanPads();
+#include "leaderboard.h"
 
-    u32 wpad = WPAD_ButtonsDown(0);
-    u32 gc = PAD_ButtonsDown(0);
+/*
+    Shows `tracks' as a list in the banner box. A opens the 150cc leaderboard of the selected track
+    (downloaded on demand), B or HOME go back. Returns when the user leaves the track list.
+*/
+void rrc_leaderboard_view_display(void *xfb, const struct rrc_tt_tracks *tracks);
 
-    struct pad_state state = {.wpad = wpad, .gc = gc};
-    return state;
-}
-
-struct pad_state rrc_pad_held()
-{
-    struct pad_state state = {.wpad = WPAD_ButtonsHeld(0), .gc = PAD_ButtonsHeld(0)};
-    return state;
-}
+#endif

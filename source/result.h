@@ -51,7 +51,9 @@ enum rrc_result_error_source
     /* Failure while installing or removing the launcher channel */
     ESOURCE_CHANNEL,
     /* Failure while loading the news feed */
-    ESOURCE_NEWS
+    ESOURCE_NEWS,
+    /* Failure while loading the time trial leaderboards */
+    ESOURCE_LEADERBOARD
 };
 
 /* Because each library uses their own set of error codes, we need to support all
@@ -147,6 +149,8 @@ struct rrc_result rrc_result_create_error_ghosts(const char *context);
 struct rrc_result rrc_result_create_error_channel(const char *context);
 
 struct rrc_result rrc_result_create_error_news(const char *context);
+
+struct rrc_result rrc_result_create_error_leaderboard(const char *context);
 
 /* Returns true if this result is an error, false otherwise. */
 inline bool rrc_result_is_error(struct rrc_result result)

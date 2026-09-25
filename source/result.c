@@ -126,6 +126,13 @@ struct rrc_result rrc_result_create_error_news(const char *context)
     return res;
 }
 
+struct rrc_result rrc_result_create_error_leaderboard(const char *context)
+{
+    union rrc_result_error_inner einner = {0};
+    struct rrc_result res = {.err = alloc_error(ESOURCE_LEADERBOARD, einner, context)};
+    return res;
+}
+
 char *rrc_result_strerror(struct rrc_result result)
 {
     if (!rrc_result_is_error(result))
@@ -175,6 +182,8 @@ char *rrc_result_strerror(struct rrc_result result)
         return "Channel management failed.";
     case ESOURCE_NEWS:
         return "Could not load the news.";
+    case ESOURCE_LEADERBOARD:
+        return "Could not load the leaderboard.";
     default:
         return NULL;
     }

@@ -1,5 +1,5 @@
 /*
-    pad.c - Unified gamepad/wiimote implementation
+    text.h - converting text for the console font
 
     Copyright (C) 2025  Retro Rewind Team
 
@@ -17,25 +17,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "pad.h"
-#include <gctypes.h>
-#include <wiiuse/wpad.h>
-#include <ogc/pad.h>
+#ifndef RRC_TEXT_H
+#define RRC_TEXT_H
 
-struct pad_state rrc_pad_buttons()
-{
-    WPAD_ScanPads();
-    PAD_ScanPads();
+/*
+    Converts UTF-8 text in place to the character set of the console font (code page 437), which
+    `rrc_gfx_draw_text' renders. Letters the font has are kept (accented Latin letters, some Greek),
+    typographic punctuation becomes its ASCII equivalent and anything else (e.g. emoji) is dropped.
+    Tabs become spaces and other control characters except newlines are dropped.
 
-    u32 wpad = WPAD_ButtonsDown(0);
-    u32 gc = PAD_ButtonsDown(0);
+    The result is never longer than the input.
+*/
+void rrc_text_utf8_to_cp437(char *s);
 
-    struct pad_state state = {.wpad = wpad, .gc = gc};
-    return state;
-}
-
-struct pad_state rrc_pad_held()
-{
-    struct pad_state state = {.wpad = WPAD_ButtonsHeld(0), .gc = PAD_ButtonsHeld(0)};
-    return state;
-}
+#endif

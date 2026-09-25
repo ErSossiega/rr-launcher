@@ -34,7 +34,8 @@
 #include "shutdown.h"
 #include "util.h"
 #include "update/update.h"
-#include "ghosts/ghosts.h"
+#include "ghosts/leaderboard.h"
+#include "ghosts/leaderboard_view.h"
 #include "news/news.h"
 #include "news/news_view.h"
 #include "version.h"
@@ -377,35 +378,26 @@ static bool run_updates(struct menu_state *st, void *xfb)
     return false;
 }
 
+/* Time trial leaderboards. Downloading the ghosts themselves (see ghosts/ghosts.h) comes later. */
 static void run_ghosts(struct menu_state *st, void *xfb)
 {
-    char *lines[] = {
-        "Download the latest ghosts from the VanzaKart server?",
-        "",
-        "They will be saved to sd:" RRC_GHOSTS_DIR};
-
-    if (rrc_prompt_yes_no(xfb, lines, 3) != RRC_PROMPT_RESULT_YES)
-        return;
-
     clear_menu(st, xfb);
 
-    int count;
-    struct rrc_result res = rrc_ghosts_download(xfb, &count);
+    struct rrc_tt_tracks tracks;
+    struct rrc_result res = rrc_tt_fetch_tracks(&tracks);
     if (rrc_result_is_error(res))
     {
         rrc_result_error_check_error_normal(res, xfb);
-        set_error_status(st, "Ghost download failed.");
+        set_error_status(st, "Could not load the leaderboards.");
+        return;
     }
-    else if (count == 0)
-    {
-        set_status(st, "No new ghosts available.");
-    }
+
+    if (tracks.count == 0)
+        set_status(st, "No leaderboards yet.");
     else
-    {
-        char status[64];
-        snprintf(status, sizeof(status), "%d ghosts downloaded.", count);
-        set_status(st, status);
-    }
+        rrc_leaderboard_view_display(xfb, &tracks);
+
+    rrc_tt_free_tracks(&tracks);
 }
 
 static void run_news(struct menu_state *st, void *xfb)
