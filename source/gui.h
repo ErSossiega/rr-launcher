@@ -66,6 +66,14 @@ void rrc_gui_xfb_alloc(void **xfb, bool sys_stdio_report);
 void rrc_gui_display_con(void *xfb, bool clear_console);
 
 /*
+    Returns true if the console is set to 16:9 in the Wii settings.
+
+    The framebuffer is always 640 pixels wide; in 16:9 the TV stretches it horizontally, so artwork
+    must be drawn squeezed (anamorphic) to look right.
+*/
+bool rrc_gui_is_widescreen();
+
+/*
     Displays the GUI banner appropriate to the current aspect ratio within the provided `xfb'.
 
     The `xfb' is assumed to fill the entire VI!

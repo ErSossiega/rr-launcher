@@ -153,11 +153,17 @@ out:
     return ret;
 }
 
+bool rrc_gui_is_widescreen()
+{
+    return CONF_GetAspectRatio() == CONF_ASPECT_16_9;
+}
+
 int rrc_gui_display_banner(void *xfb)
 {
     GXRModeObj *rmode = rrc_gui_get_video_mode();
     extern char banner4_3[];
-    return _rrc_gui_draw_banner(xfb, banner4_3, rmode);
+    extern char banner16_9[];
+    return _rrc_gui_draw_banner(xfb, rrc_gui_is_widescreen() ? banner16_9 : banner4_3, rmode);
 }
 
 /* set video mode in appropriate memory map value */

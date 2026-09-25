@@ -105,6 +105,13 @@ struct rrc_result rrc_result_create_error_version_mismatch(const char *context)
     return res;
 }
 
+struct rrc_result rrc_result_create_error_ghosts(const char *context)
+{
+    union rrc_result_error_inner einner = {0};
+    struct rrc_result res = {.err = alloc_error(ESOURCE_GHOSTS, einner, context)};
+    return res;
+}
+
 char *rrc_result_strerror(struct rrc_result result)
 {
     if (!rrc_result_is_error(result))
@@ -148,6 +155,8 @@ char *rrc_result_strerror(struct rrc_result result)
         return "Invalid or corrupted " RRC_RETRO_REWIND_BASE_DIR ".xml.";
     case ESOURCE_VERSION_MISMATCH:
         return "Version mismatch.";
+    case ESOURCE_GHOSTS:
+        return "Ghost download failed.";
     default:
         return NULL;
     }

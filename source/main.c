@@ -42,6 +42,7 @@
 #include <riivo.h>
 #include "console.h"
 #include "settings.h"
+#include "menu.h"
 #include "update/versionsfile.h"
 #include "update/update.h"
 #include "prompt.h"
@@ -108,7 +109,7 @@ int main(int argc, char **argv)
         char *lines[] = {
             "Welcome to the (beta) VanzaKart Channel!",
             "",
-            "You will now be taken to the settings menu.",
+            "Press B in the main menu to open the settings.",
             "Please make sure your settings are the same",
             "as what you used with the old channel.",
             "",
@@ -256,48 +257,12 @@ int main(int argc, char **argv)
         }
     }
 
-#define INTERRUPT_TIME 5000000 /* 5 seconds */
-    rrc_con_clear(true);
-
-    if (!first_open)
+    // Only allow auto launch if this is a successful, regular boot
+    bool allow_autolaunch = !first_open && !loaded_from_rr && !crashed;
+    if (rrc_menu_display(xfb, &stored_settings, allow_autolaunch) == RRC_MENU_EXIT)
     {
-        rrc_con_print_text_centered(_RRC_ACTION_ROW, "Press A to launch, or press B to load settings.");
-        rrc_con_print_text_centered(_RRC_ACTION_ROW + 1, "Auto-launching in 5 seconds...");
+        return 0;
     }
-
-    for (int i = 0; i < INTERRUPT_TIME / RRC_WPAD_LOOP_TIMEOUT; i++)
-    {
-        rrc_shutdown_check();
-
-        struct pad_state pad = rrc_pad_buttons();
-
-        if (rrc_pad_home_pressed(pad))
-        {
-            return 0;
-        }
-        else if (rrc_pad_a_pressed(pad))
-        {
-            break;
-        }
-        // Only allow auto launch if this is a successful first boot
-        else if (rrc_pad_b_pressed(pad) || first_open || loaded_from_rr || crashed)
-        {
-            struct rrc_result r;
-            int out = rrc_settings_display(xfb, &stored_settings, &r);
-            rrc_result_error_check_error_fatal(r);
-
-            switch (out)
-            {
-            case RRC_SETTINGS_LAUNCH:
-                goto interrupt_loop_end;
-            case RRC_SETTINGS_EXIT:
-                return 0;
-            }
-        }
-
-        usleep(RRC_WPAD_LOOP_TIMEOUT);
-    }
-interrupt_loop_end:
 
     rrc_con_clear(true);
 
