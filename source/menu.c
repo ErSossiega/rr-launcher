@@ -113,6 +113,8 @@ extern char tile_updates[];
 extern char tile_install_channel[];
 extern char tile_settings[];
 extern char tile_ghosts[];
+extern char tile_news[];
+extern char tile_remove_channel[];
 
 static const struct menu_tile menu_tiles[] = {
     {.label = "Launch Game", .image = tile_play, .action = MENU_ACTION_LAUNCH},
@@ -120,11 +122,11 @@ static const struct menu_tile menu_tiles[] = {
     {.label = "Install Channel", .image = tile_install_channel, .action = MENU_ACTION_INSTALL_CHANNEL},
     {.label = "Settings", .image = tile_settings, .action = MENU_ACTION_SETTINGS},
     {.label = "Ghosts", .image = tile_ghosts, .action = MENU_ACTION_GHOSTS},
-    {.label = "News", .action = MENU_ACTION_NEWS},
+    {.label = "News", .image = tile_news, .action = MENU_ACTION_NEWS},
 };
 
 /* Takes the place of the "Install Channel" tile while the channel is installed. */
-static const struct menu_tile remove_channel_tile = {.label = "Remove Launcher", .action = MENU_ACTION_REMOVE_CHANNEL};
+static const struct menu_tile remove_channel_tile = {.label = "Remove Channel", .image = tile_remove_channel, .action = MENU_ACTION_REMOVE_CHANNEL};
 
 #define TILE_COUNT ((int)(sizeof(menu_tiles) / sizeof(menu_tiles[0])))
 #define ROW_COUNT ((TILE_COUNT + MENU_COLS - 1) / MENU_COLS)
@@ -445,7 +447,7 @@ static void load_tile_image(struct menu_state *st, int i)
     rrc_gfx_image_free(&decoded);
 }
 
-/* Shows "Install Channel" or "Remove Launcher" depending on whether the channel is installed. */
+/* Shows "Install Channel" or "Remove Channel" depending on whether the channel is installed. */
 static void refresh_channel_tile(struct menu_state *st)
 {
     for (int i = 0; i < TILE_COUNT; i++)

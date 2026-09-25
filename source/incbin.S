@@ -54,3 +54,13 @@ tile_settings:
 	.balign 32
 tile_ghosts:
 	.incbin "../data/tile_ghosts"
+
+	.globl tile_news
+	.balign 32
+tile_news:
+	.incbin "../data/tile_news"
+
+	.globl tile_remove_channel
+	.balign 32
+tile_remove_channel:
+	.incbin "../data/tile_remove_channel"
