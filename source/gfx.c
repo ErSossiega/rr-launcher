@@ -276,32 +276,66 @@ static inline u32 rgb_pair_to_ycbycr(u32 p1, u32 p2)
 }
 
 /*
-    Resamples a row of `src_w' pixels to `dst_w' pixels by averaging the source pixels each destination
+    Resamples a line of `src_n' pixels to `dst_n' pixels by averaging the source pixels each destination
     pixel covers (box filter), so thin lines like text strokes survive downscaling.
+    The strides (in pixels) allow resampling columns as well as rows.
 */
-static void scale_row(const u32 *src, int src_w, u32 *dst, int dst_w)
+static void scale_line(const u32 *src, int src_n, int src_stride, u32 *dst, int dst_n, int dst_stride)
 {
-    for (int i = 0; i < dst_w; i++)
+    for (int i = 0; i < dst_n; i++)
     {
         // span of source pixels covered by destination pixel `i', in 1/256ths of a pixel
-        int start = (i * src_w * 256) / dst_w;
-        int end = ((i + 1) * src_w * 256) / dst_w;
-        u32 r = 0, g = 0, b = 0;
+        int start = (i * src_n * 256) / dst_n;
+        int end = ((i + 1) * src_n * 256) / dst_n;
+        u32 r = 0, g = 0, b = 0, a = 0;
 
-        for (int p = start >> 8; p * 256 < end && p < src_w; p++)
+        for (int p = start >> 8; p * 256 < end && p < src_n; p++)
         {
             int lo = p * 256 > start ? p * 256 : start;
             int hi = (p + 1) * 256 < end ? (p + 1) * 256 : end;
             u32 weight = hi - lo;
+            u32 c = src[p * src_stride];
 
-            r += CH_R(src[p]) * weight;
-            g += CH_G(src[p]) * weight;
-            b += CH_B(src[p]) * weight;
+            r += CH_R(c) * weight;
+            g += CH_G(c) * weight;
+            b += CH_B(c) * weight;
+            a += CH_A(c) * weight;
         }
 
         u32 total = end - start;
-        dst[i] = RRC_GFX_RGBA(r / total, g / total, b / total, 0xFF);
+        dst[i * dst_stride] = RRC_GFX_RGBA(r / total, g / total, b / total, a / total);
     }
+}
+
+int rrc_gfx_image_resize(struct rrc_gfx_image *dst, const struct rrc_gfx_image *src, int width, int height)
+{
+    // Scale rows first into an intermediate image, then its columns into `dst'.
+    struct rrc_gfx_image tmp;
+    if (rrc_gfx_image_alloc(&tmp, width, src->height) != 0)
+    {
+        dst->pixels = NULL;
+        dst->width = dst->height = 0;
+        return -1;
+    }
+
+    if (rrc_gfx_image_alloc(dst, width, height) != 0)
+    {
+        rrc_gfx_image_free(&tmp);
+        return -1;
+    }
+
+    for (int y = 0; y < src->height; y++)
+    {
+        scale_line(&src->pixels[y * src->width], src->width, 1, &tmp.pixels[y * width], width, 1);
+    }
+
+    for (int x = 0; x < width; x++)
+    {
+        scale_line(&tmp.pixels[x], src->height, width, &dst->pixels[x], height, width);
+    }
+
+    rrc_gfx_image_free(&tmp);
+    return 0;
 }
 
 void rrc_gfx_present(const struct rrc_gfx_image *src, void *xfb, GXRModeObj *rmode, int x, int y, int width)
@@ -319,7 +353,7 @@ void rrc_gfx_present(const struct rrc_gfx_image *src, void *xfb, GXRModeObj *rmo
         const u32 *line = &src->pixels[row * src->width];
         if (width != src->width)
         {
-            scale_row(line, src->width, scaled, width);
+            scale_line(line, src->width, 1, scaled, width, 1);
             line = scaled;
         }
 

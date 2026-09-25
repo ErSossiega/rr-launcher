@@ -61,6 +61,14 @@ int rrc_gfx_image_from_png(struct rrc_gfx_image *img, const void *png);
 
 void rrc_gfx_image_free(struct rrc_gfx_image *img);
 
+/*
+    Allocates `dst' and fills it with `src' resampled to `width' x `height' (box filter, suited to
+    downscaling).
+
+    Returns 0 on success, -1 on error, in which case `dst' holds no pixels.
+*/
+int rrc_gfx_image_resize(struct rrc_gfx_image *dst, const struct rrc_gfx_image *src, int width, int height);
+
 /* Fills the whole image with `color', ignoring its alpha. */
 void rrc_gfx_clear(struct rrc_gfx_image *dst, u32 color);
 

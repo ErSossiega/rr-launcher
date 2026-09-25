@@ -109,7 +109,7 @@ int main(int argc, char **argv)
         char *lines[] = {
             "Welcome to the (beta) VanzaKart Channel!",
             "",
-            "Press B in the main menu to open the settings.",
+            "Open Settings from the main menu.",
             "Please make sure your settings are the same",
             "as what you used with the old channel.",
             "",

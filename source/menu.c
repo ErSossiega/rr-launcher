@@ -24,6 +24,7 @@
 #include <gccore.h>
 
 #include "menu.h"
+#include "channel.h"
 #include "console.h"
 #include "gfx.h"
 #include "gui.h"
@@ -55,8 +56,12 @@
 #define MENU_GAP 12
 #define MENU_FOOTER_H 40
 
-/* Tiles per row. Six tiles in `tiles' with three columns gives a 3x2 grid. */
-#define MENU_COLS 2
+/* Tiles per row: the six entries of `tiles' make a 3x2 grid. */
+#define MENU_COLS 3
+
+/* Tiles keep the proportions of their artwork. */
+#define TILE_ASPECT_W 16
+#define TILE_ASPECT_H 9
 
 #define TILE_RADIUS 12
 #define TILE_BORDER 3
@@ -85,7 +90,9 @@ enum menu_action
 {
     MENU_ACTION_LAUNCH,
     MENU_ACTION_UPDATES,
-    MENU_ACTION_CHANNEL,
+    MENU_ACTION_INSTALL_CHANNEL,
+    MENU_ACTION_REMOVE_CHANNEL,
+    MENU_ACTION_SETTINGS,
     MENU_ACTION_GHOSTS,
     /* Placeholder slot for a future feature; drawn greyed out. */
     MENU_ACTION_NONE
@@ -97,29 +104,44 @@ struct menu_tile
     const char *label;
 
     /*
-        Embedded PNG artwork (see incbin.S) including its own caption, or NULL to draw an empty slot
-        with `label' instead. Any size works as it is stretched to the tile, but matching the tile size
-        (237x114 for the 2x2 grid, in both 4:3 and 16:9) keeps it sharp.
+        Embedded 16:9 PNG artwork (see incbin.S) including its own caption, or NULL to draw an empty slot
+        with `label' instead. It is resized to the tile once when the menu opens.
     */
     const void *image;
 
     enum menu_action action;
 };
 
-static const struct menu_tile tiles[] = {
-    {.label = "Launch Game", .action = MENU_ACTION_LAUNCH},
-    {.label = "Updates", .action = MENU_ACTION_UPDATES},
-    {.label = "Channel", .action = MENU_ACTION_CHANNEL},
-    {.label = "Ghosts", .action = MENU_ACTION_GHOSTS},
+/* Generated from assets/Images by tools/make_tiles.py */
+extern char tile_play[];
+extern char tile_updates[];
+extern char tile_install_channel[];
+extern char tile_settings[];
+extern char tile_ghosts[];
+
+static const struct menu_tile menu_tiles[] = {
+    {.label = "Launch Game", .image = tile_play, .action = MENU_ACTION_LAUNCH},
+    {.label = "Updates", .image = tile_updates, .action = MENU_ACTION_UPDATES},
+    {.label = "Install Channel", .image = tile_install_channel, .action = MENU_ACTION_INSTALL_CHANNEL},
+    {.label = "Settings", .image = tile_settings, .action = MENU_ACTION_SETTINGS},
+    {.label = "Ghosts", .image = tile_ghosts, .action = MENU_ACTION_GHOSTS},
+    {.label = "Coming Soon", .action = MENU_ACTION_NONE},
 };
 
-#define TILE_COUNT ((int)(sizeof(tiles) / sizeof(tiles[0])))
+/* Takes the place of the "Install Channel" tile while the channel is installed. */
+static const struct menu_tile remove_channel_tile = {.label = "Remove Launcher", .action = MENU_ACTION_REMOVE_CHANNEL};
+
+#define TILE_COUNT ((int)(sizeof(menu_tiles) / sizeof(menu_tiles[0])))
 #define ROW_COUNT ((TILE_COUNT + MENU_COLS - 1) / MENU_COLS)
 
 struct menu_state
 {
     struct rrc_gfx_image canvas;
+    /* `menu_tiles', with the channel tile swapped depending on whether the channel is installed. */
+    struct menu_tile tiles[TILE_COUNT];
     struct rrc_gfx_image images[TILE_COUNT];
+    int tile_w;
+    int tile_h;
     int selected;
     char status[64];
     u32 status_color;
@@ -127,30 +149,39 @@ struct menu_state
     char channel_version[32];
 };
 
-/*
-    Tile size comes from the 4:3 layout and is the same in 16:9, so artwork only has to be made once;
-    the extra width in 16:9 goes to the spacing between tiles.
-*/
-static int tile_width()
-{
-    return (MENU_W - 2 * MENU_PAD - (MENU_COLS - 1) * MENU_GAP) / MENU_COLS;
-}
+/* Height of the area above the footer that holds the grid. */
+#define GRID_AREA_H (MENU_H - 2 * MENU_PAD - MENU_FOOTER_H)
 
-static int tile_height()
+/*
+    Makes the tiles as large as the canvas allows while keeping their aspect ratio: as wide as the
+    columns allow (4:3), unless the rows then don't fit (16:9, where the canvas is wider).
+*/
+static void compute_tile_size(struct menu_state *st)
 {
-    return (MENU_H - 2 * MENU_PAD - MENU_FOOTER_H - (ROW_COUNT - 1) * MENU_GAP) / ROW_COUNT;
+    int w = (st->canvas.width - 2 * MENU_PAD - (MENU_COLS - 1) * MENU_GAP) / MENU_COLS;
+    int h = w * TILE_ASPECT_H / TILE_ASPECT_W;
+
+    int max_h = (GRID_AREA_H - (ROW_COUNT - 1) * MENU_GAP) / ROW_COUNT;
+    if (h > max_h)
+    {
+        h = max_h;
+        w = h * TILE_ASPECT_W / TILE_ASPECT_H;
+    }
+
+    st->tile_w = w;
+    st->tile_h = h;
 }
 
 /* Horizontal space between tiles (and around a full row), spread evenly across the canvas. */
 static int tile_gap_x(const struct menu_state *st)
 {
-    return (st->canvas.width - MENU_COLS * tile_width()) / (MENU_COLS + 1);
+    return (st->canvas.width - MENU_COLS * st->tile_w) / (MENU_COLS + 1);
 }
 
 /* Left and right edges of a full row of tiles, which the footer text lines up with. */
 static void grid_bounds(const struct menu_state *st, int *left, int *right)
 {
-    int row_w = MENU_COLS * tile_width() + (MENU_COLS - 1) * tile_gap_x(st);
+    int row_w = MENU_COLS * st->tile_w + (MENU_COLS - 1) * tile_gap_x(st);
     *left = (st->canvas.width - row_w) / 2;
     *right = *left + row_w;
 }
@@ -165,17 +196,18 @@ static void tile_position(const struct menu_state *st, int i, int *x, int *y)
         in_row = MENU_COLS;
 
     int gap = tile_gap_x(st);
-    int row_w = in_row * tile_width() + (in_row - 1) * gap;
-    *x = (st->canvas.width - row_w) / 2 + col * (tile_width() + gap);
-    *y = MENU_PAD + row * (tile_height() + MENU_GAP);
+    int row_w = in_row * st->tile_w + (in_row - 1) * gap;
+    int grid_h = ROW_COUNT * st->tile_h + (ROW_COUNT - 1) * MENU_GAP;
+    *x = (st->canvas.width - row_w) / 2 + col * (st->tile_w + gap);
+    *y = MENU_PAD + (GRID_AREA_H - grid_h) / 2 + row * (st->tile_h + MENU_GAP);
 }
 
-/* Labels are drawn large unless one of them would not fit, so that all tiles match. */
-static int label_scale()
+/* Labels of empty slots are drawn large unless one of them would not fit, so that they all match. */
+static int label_scale(const struct menu_state *st)
 {
     for (int i = 0; i < TILE_COUNT; i++)
     {
-        if (rrc_gfx_text_width(tiles[i].label, 2) > tile_width() - 2 * TILE_LABEL_MARGIN)
+        if (st->images[i].pixels == NULL && rrc_gfx_text_width(st->tiles[i].label, 2) > st->tile_w - 2 * TILE_LABEL_MARGIN)
             return 1;
     }
 
@@ -190,9 +222,9 @@ static void draw_text_shadowed(struct rrc_gfx_image *dst, int x, int y, const ch
 
 static void draw_tile(struct menu_state *st, int i)
 {
-    const struct menu_tile *tile = &tiles[i];
+    const struct menu_tile *tile = &st->tiles[i];
     bool selected = st->selected == i;
-    int w = tile_width(), h = tile_height();
+    int w = st->tile_w, h = st->tile_h;
     int x, y;
     tile_position(st, i, &x, &y);
 
@@ -207,7 +239,7 @@ static void draw_tile(struct menu_state *st, int i)
     {
         rrc_gfx_fill_rounded_rect(&st->canvas, x, y, w, h, TILE_RADIUS, COLOR_SLOT_TOP, COLOR_SLOT_BOTTOM);
 
-        int scale = label_scale();
+        int scale = label_scale(st);
         int tx = x + (w - rrc_gfx_text_width(tile->label, scale)) / 2;
         int ty = y + (h - RRC_GFX_FONT_H * scale) / 2;
         u32 color = tile->action == MENU_ACTION_NONE ? COLOR_LABEL_DISABLED : COLOR_LABEL;
@@ -237,7 +269,7 @@ static void draw_menu(struct menu_state *st, void *xfb)
 
     rrc_gfx_draw_text(&st->canvas, left, status_y, st->status, 1, st->status_color);
     rrc_gfx_draw_text(&st->canvas, right - rrc_gfx_text_width(st->channel_version, 1), status_y, st->channel_version, 1, COLOR_FOOTER);
-    rrc_gfx_draw_text(&st->canvas, left, hints_y, "A: Select   B: Settings   HOME: Exit", 1, COLOR_FOOTER);
+    rrc_gfx_draw_text(&st->canvas, left, hints_y, "A: Select   HOME: Exit", 1, COLOR_FOOTER);
     rrc_gfx_draw_text(&st->canvas, right - rrc_gfx_text_width(st->vk_version, 1), hints_y, st->vk_version, 1, COLOR_FOOTER);
 
     rrc_gfx_present(&st->canvas, xfb, rrc_gui_get_video_mode(), MENU_X, MENU_Y, MENU_W);
@@ -379,6 +411,69 @@ static void run_ghosts(struct menu_state *st, void *xfb)
     }
 }
 
+/* Loads the artwork of tile `i', resized to the tile. Without artwork the tile is drawn as an empty slot. */
+static void load_tile_image(struct menu_state *st, int i)
+{
+    rrc_gfx_image_free(&st->images[i]);
+
+    if (st->tiles[i].image == NULL)
+        return;
+
+    // A tile whose artwork fails to load just falls back to an empty slot.
+    struct rrc_gfx_image decoded = {NULL, 0, 0};
+    if (rrc_gfx_image_from_png(&decoded, st->tiles[i].image) != 0 ||
+        rrc_gfx_image_resize(&st->images[i], &decoded, st->tile_w, st->tile_h) != 0)
+    {
+        rrc_dbg_printf("failed to load artwork for menu tile '%s'\n", st->tiles[i].label);
+    }
+    rrc_gfx_image_free(&decoded);
+}
+
+/* Shows "Install Channel" or "Remove Launcher" depending on whether the channel is installed. */
+static void refresh_channel_tile(struct menu_state *st)
+{
+    for (int i = 0; i < TILE_COUNT; i++)
+    {
+        if (menu_tiles[i].action != MENU_ACTION_INSTALL_CHANNEL)
+            continue;
+
+        const struct menu_tile *tile = rrc_channel_is_installed() ? &remove_channel_tile : &menu_tiles[i];
+        if (st->tiles[i].action != tile->action)
+        {
+            st->tiles[i] = *tile;
+            load_tile_image(st, i);
+        }
+    }
+}
+
+static void run_channel_action(struct menu_state *st, void *xfb, bool uninstall)
+{
+    char *lines[] = {
+        uninstall ? "Remove the VanzaKart Launcher channel from the Wii Menu?"
+               : "Install the VanzaKart Launcher channel to the Wii Menu?",
+        "",
+        uninstall ? "Your VanzaKart files on the SD card will not be touched."
+               : "You can then start VanzaKart without the Homebrew Channel."};
+
+    if (rrc_prompt_yes_no(xfb, lines, 3) != RRC_PROMPT_RESULT_YES)
+        return;
+
+    clear_menu(st, xfb);
+
+    struct rrc_result res = uninstall ? rrc_channel_remove(xfb) : rrc_channel_install(xfb);
+    if (rrc_result_is_error(res))
+    {
+        rrc_result_error_check_error_normal(res, xfb);
+        set_error_status(st, uninstall ? "Removing the channel failed." : "Installing the channel failed.");
+    }
+    else
+    {
+        set_status(st, uninstall ? "Channel removed." : "Channel installed.");
+    }
+
+    refresh_channel_tile(st);
+}
+
 enum rrc_menu_result rrc_menu_display(void *xfb, struct rrc_settingsfile *stored_settings, bool allow_autolaunch)
 {
     enum rrc_menu_result result;
@@ -391,14 +486,14 @@ enum rrc_menu_result rrc_menu_display(void *xfb, struct rrc_settingsfile *stored
         RRC_FATAL("failed to allocate the menu canvas");
     }
 
+    compute_tile_size(&st);
+
     for (int i = 0; i < TILE_COUNT; i++)
     {
-        // A tile whose artwork fails to decode just falls back to an empty slot.
-        if (tiles[i].image != NULL && rrc_gfx_image_from_png(&st.images[i], tiles[i].image) != 0)
-        {
-            rrc_dbg_printf("failed to decode artwork for menu tile '%s'\n", tiles[i].label);
-        }
+        st.tiles[i] = menu_tiles[i];
+        load_tile_image(&st, i);
     }
+    refresh_channel_tile(&st);
 
     load_versions(&st);
 
@@ -455,22 +550,11 @@ enum rrc_menu_result rrc_menu_display(void *xfb, struct rrc_settingsfile *stored
             result = RRC_MENU_EXIT;
             goto out;
         }
-        else if (rrc_pad_b_pressed(pad))
-        {
-            clear_menu(&st, xfb);
-
-            struct rrc_result r;
-            enum rrc_settings_result settings_res = rrc_settings_display(xfb, stored_settings, &r);
-            rrc_result_error_check_error_fatal(r);
-
-            result = settings_res == RRC_SETTINGS_LAUNCH ? RRC_MENU_LAUNCH : RRC_MENU_EXIT;
-            goto out;
-        }
         else if (rrc_pad_a_pressed(pad))
         {
             set_status(&st, "");
 
-            switch (tiles[st.selected].action)
+            switch (st.tiles[st.selected].action)
             {
             case MENU_ACTION_LAUNCH:
                 result = RRC_MENU_LAUNCH;
@@ -484,19 +568,29 @@ enum rrc_menu_result rrc_menu_display(void *xfb, struct rrc_settingsfile *stored
                 }
                 break;
 
+            case MENU_ACTION_SETTINGS:
+            {
+                clear_menu(&st, xfb);
+
+                struct rrc_result r;
+                enum rrc_settings_result settings_res = rrc_settings_display(xfb, stored_settings, &r);
+                rrc_result_error_check_error_fatal(r);
+
+                result = settings_res == RRC_SETTINGS_LAUNCH ? RRC_MENU_LAUNCH : RRC_MENU_EXIT;
+                goto out;
+            }
+
             case MENU_ACTION_GHOSTS:
                 run_ghosts(&st, xfb);
                 break;
 
-            case MENU_ACTION_CHANNEL:
-            {
-                char *lines[] = {
-                    "Channel management is not available yet.",
-                    "",
-                    "Stay tuned for a future update!"};
-                rrc_prompt_1_option(xfb, lines, 3, "OK");
+            case MENU_ACTION_INSTALL_CHANNEL:
+                run_channel_action(&st, xfb, false);
                 break;
-            }
+
+            case MENU_ACTION_REMOVE_CHANNEL:
+                run_channel_action(&st, xfb, true);
+                break;
 
             case MENU_ACTION_NONE:
                 set_status(&st, "Coming soon!");
