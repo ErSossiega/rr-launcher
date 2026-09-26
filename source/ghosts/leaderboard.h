@@ -50,7 +50,7 @@ struct rrc_tt_tracks
 struct rrc_tt_entry
 {
     int rank;
-    /* Name of the player's time trial profile. */
+    /* Mii name stored in the ghost, or the name of the player's time trial profile if it has none. */
     char *player;
     /* ISO 3166 two-letter country code of the profile (e.g. "IT"), or empty if it has none. */
     char country[3];

@@ -192,7 +192,14 @@ struct rrc_result rrc_tt_fetch_leaderboard(int track_id, struct rrc_tt_leaderboa
 
         struct rrc_tt_entry *e = &leaderboard->entries[leaderboard->count];
         e->rank = (int)rrc_json_get_number(item, "rank", leaderboard->count + 1);
-        e->player = copy_text(item, "playerName", "?");
+        // The Mii name stored in the ghost, rather than the profile name. Wii-only symbols in it
+        // are dropped by the conversion, so fall back to the profile if nothing printable is left.
+        e->player = copy_text(item, "miiName", "");
+        if (e->player != NULL && e->player[strspn(e->player, " ")] == '\0')
+        {
+            free(e->player);
+            e->player = copy_text(item, "playerName", "?");
+        }
 
         const char *country = rrc_json_get_string(item, "countryAlpha2");
         if (country != NULL && isalpha((unsigned char)country[0]) && isalpha((unsigned char)country[1]) && country[2] == '\0')
