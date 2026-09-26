@@ -27,6 +27,21 @@
 #define RRC_UPDATE_LARGE_THRESHOLD (long)(1000 * 1000 * 100) /* 100MB */
 #define RRC_VERSIONFILE "/" RRC_RETRO_REWIND_BASE_DIR "/version.txt"
 
+/*
+    The launcher (the channel itself) is versioned separately from the pack: this file on the server holds
+    one line, "<version> <url of the launcher ZIP>", e.g.
+    "1.0.0 http://vanzakart.net:8000/VanzaKart/updates/VanzaKartChannel-1.0.0.zip".
+    When the version is newer than RRC_INTERNAL_VERSION, the ZIP is installed along with the pack updates.
+    It may only contain files under RRC_LAUNCHER_APP_DIR and RRC_RETRO_REWIND_CHANNEL_DIR.
+*/
+#if defined(RRC_BETA) && RRC_BETA >= 1
+#define RRC_LAUNCHER_VERSION_URL "http://vanzakart.net:8000/VanzaKart/VanzaKartChannelBeta.txt"
+#define RRC_LAUNCHER_APP_DIR "apps/VanzaKartBeta"
+#else
+#define RRC_LAUNCHER_VERSION_URL "http://vanzakart.net:8000/VanzaKart/VanzaKartChannel.txt"
+#define RRC_LAUNCHER_APP_DIR "apps/VanzaKart"
+#endif
+
 /* Holds all info related to an update or sequence of updates */
 struct rrc_update_state
 {
@@ -99,6 +114,7 @@ struct rrc_result rrc_update_do_updates_with_state(struct rrc_update_state *stat
 
 /*
     Checks if updates are needed, and if there are, prompt the user and and download them. See `rrc_update_do_updates_with_state` for more details.
+    A newer launcher (see RRC_LAUNCHER_VERSION_URL) counts as one more update and is installed after the pack updates.
     This also writes the number of available updates into `count' and returns whether the updates were actually installed.
 */
 struct rrc_result rrc_update_do_updates(void *xfb, int *count, bool *any_updates_installed);

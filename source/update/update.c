@@ -37,6 +37,8 @@
 #include "../shutdown.h"
 #include "../versionutils.h"
 #include "../sd.h"
+#include "../http.h"
+#include "version.h"
 
 #define _RRC_UPDATE_ZIP_NAME "vk.update.zip"
 
@@ -343,7 +345,26 @@ static struct rrc_result mkdir_recursive(const char *fp)
     return rrc_result_success;
 }
 
-struct rrc_result rrc_update_extract_zip_archive()
+/* Whether `path' is inside one of the folders in the NULL-terminated `prefixes' (each ending with '/'). */
+static bool path_is_allowed(const char *path, const char *const *prefixes)
+{
+    if (strstr(path, "..") != NULL)
+        return false;
+
+    for (int i = 0; prefixes[i] != NULL; i++)
+    {
+        if (strncmp(path, prefixes[i], strlen(prefixes[i])) == 0)
+            return true;
+    }
+
+    return false;
+}
+
+/*
+    Extracts the downloaded update ZIP to the root of the SD card. If `allowed_prefixes' is not NULL, the ZIP is
+    rejected before anything is written unless all its files are inside those folders.
+*/
+struct rrc_result rrc_update_extract_zip_archive(const char *const *allowed_prefixes)
 {
     int zip_err;
     struct zip *archive = zip_open(_RRC_UPDATE_ZIP_NAME, ZIP_CHECKCONS | ZIP_RDONLY, &zip_err);
@@ -369,6 +390,13 @@ struct rrc_result rrc_update_extract_zip_archive()
         if (stat.valid & ZIP_STAT_SIZE)
         {
             uncompressed_zipsz += stat.size;
+        }
+
+        if (allowed_prefixes != NULL && (stat.valid & ZIP_STAT_NAME) && stat.name[0] != '\0' &&
+            stat.name[strlen(stat.name) - 1] != '/' && !path_is_allowed(stat.name, allowed_prefixes))
+        {
+            zip_close(archive);
+            return rrc_result_create_error_misc_update("The launcher update contains unexpected files.");
         }
     }
 
@@ -544,7 +572,7 @@ struct rrc_result rrc_update_do_updates_with_state(struct rrc_update_state *stat
             return rrc_result_create_error_errno(errno, "Failed to stat update ZIP file");
         }
 
-        TRY(rrc_update_extract_zip_archive());
+        TRY(rrc_update_extract_zip_archive(NULL));
 
         int rres = remove(_RRC_UPDATE_ZIP_NAME);
         if (rres == -1)
@@ -576,6 +604,47 @@ struct rrc_result rrc_update_do_updates_with_state(struct rrc_update_state *stat
     }
 
     return rrc_result_success;
+}
+
+/*
+    Reads RRC_LAUNCHER_VERSION_URL. Returns true and fills `version' and `url' if it names a launcher newer than
+    this one. A missing or malformed file just means there is no launcher update, so the pack still updates.
+*/
+static bool launcher_update_available(struct rrc_version *version, char *url, size_t url_size)
+{
+    char *data;
+    size_t len;
+    struct rrc_result res = rrc_http_get(RRC_LAUNCHER_VERSION_URL, "Get Launcher Version", &data, &len);
+    if (rrc_result_is_error(res))
+    {
+        rrc_result_free(res);
+        return false;
+    }
+
+    char link[256];
+    bool parsed = sscanf(data, "%d.%d.%d %255s", &version->major, &version->minor, &version->patch, link) == 4;
+    free(data);
+    if (!parsed || strlen(link) >= url_size)
+        return false;
+
+    struct rrc_version current = RRC_INTERNAL_VERSION;
+    if (!rrc_version_is_older(&current, version))
+        return false;
+
+    strcpy(url, link);
+    return true;
+}
+
+/* Downloads the launcher ZIP at `url' and extracts it over the launcher's own files. */
+static struct rrc_result launcher_update_install(char *url)
+{
+    TRY(rrc_update_download_zip(url, _RRC_UPDATE_ZIP_NAME, 0, 1));
+
+    // Anything else in the ZIP would be written anywhere on the SD card, so only allow the launcher's folders.
+    const char *const allowed[] = {RRC_LAUNCHER_APP_DIR "/", RRC_RETRO_REWIND_CHANNEL_DIR "/", NULL};
+    struct rrc_result res = rrc_update_extract_zip_archive(allowed);
+    remove(_RRC_UPDATE_ZIP_NAME);
+    return res;
 }
 
 struct rrc_result rrc_update_do_updates(void *xfb, int *count, bool *updates_installed)
@@ -612,10 +681,20 @@ struct rrc_result rrc_update_do_updates(void *xfb, int *count, bool *updates_ins
 
     rrc_con_update("Get Download URLs", 20);
     TRY(rrc_versionsfile_get_necessary_urls_and_versions(versionsfile, &current, count, &zip_urls, &update_versions));
+    int pack_count = *count;
+
+    // The launcher is versioned on its own; a newer one counts as one more update.
+    struct rrc_version launcher_version;
+    char launcher_url[256];
+    bool launcher_update = launcher_update_available(&launcher_version, launcher_url, sizeof(launcher_url));
+    if (launcher_update)
+    {
+        (*count)++;
+    }
 
     if (*count > 0)
     {
-        char *lines[] = {"An update is available."};
+        char *lines[] = {pack_count > 0 ? "An update is available." : "A launcher update is available."};
 
         enum rrc_prompt_result result = rrc_prompt_2_options(xfb, lines, 1, "Update", "Skip", RRC_PROMPT_RESULT_YES, RRC_PROMPT_RESULT_NO);
         if (result == RRC_PROMPT_RESULT_NO)
@@ -623,6 +702,14 @@ struct rrc_result rrc_update_do_updates(void *xfb, int *count, bool *updates_ins
             return rrc_result_success;
         }
     } else {
+        return rrc_result_success;
+    }
+
+    if (pack_count == 0)
+    {
+        // Only the launcher needs updating.
+        TRY(launcher_update_install(launcher_url));
+        *updates_installed = true;
         return rrc_result_success;
     }
 
@@ -640,7 +727,7 @@ struct rrc_result rrc_update_do_updates(void *xfb, int *count, bool *updates_ins
         {
             .current_update_num = 0,
             .d_ptr = NULL,
-            .num_updates = *count,
+            .num_updates = pack_count,
             .update_urls = zip_urls,
             .update_versions = update_versions,
             .current_version = current,
@@ -675,6 +762,11 @@ struct rrc_result rrc_update_do_updates(void *xfb, int *count, bool *updates_ins
     }
 
     TRY(rrc_update_do_updates_with_state(&state));
+
+    if (launcher_update)
+    {
+        TRY(launcher_update_install(launcher_url));
+    }
 
     *updates_installed = true;
 
