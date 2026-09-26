@@ -23,6 +23,7 @@
 #include <unistd.h>
 
 #include "leaderboard_view.h"
+#include "flags_generated.h"
 #include "../gfx.h"
 #include "../gui.h"
 #include "../pad.h"
@@ -40,7 +41,8 @@
 
 /* Leaderboard columns, in characters. The player column takes what is left, within these bounds. */
 #define COL_RANK_W 3
-#define COL_COUNTRY_W 2
+/* A flag (RRC_FLAG_W pixels) or, for countries without one, the two-letter code. */
+#define COL_COUNTRY_W 3
 #define COL_CHARACTER_W 12
 #define COL_VEHICLE_W 16
 /* "m:ss.mmm" */
@@ -69,7 +71,12 @@ struct view
     struct rrc_gfx_image canvas;
     /* Characters per line. */
     int cols;
+    /* All flags in one image, see tools/make_flags.py. No pixels if it failed to load. */
+    struct rrc_gfx_image flags;
 };
+
+/* The atlas made by tools/make_flags.py (see incbin.S). */
+extern char flag_atlas[];
 
 static void draw_text(struct view *v, int col, int y, const char *s, u32 color)
 {
@@ -97,6 +104,26 @@ static void fit(char *dst, const char *src, int width)
         memcpy(dst, src, width - 2);
         memcpy(dst + width - 2, "..", 3);
     }
+}
+
+/* Draws the flag of `country' with its top left corner at (`x', `y'), or its code if there is no flag. */
+static void draw_country(struct view *v, int x, int y, const char *country, u32 fallback_color)
+{
+    if (country[0] == '\0')
+        return;
+
+    for (int i = 0; i < RRC_FLAG_COUNT && v->flags.pixels != NULL; i++)
+    {
+        if (rrc_flag_codes[2 * i] == country[0] && rrc_flag_codes[2 * i + 1] == country[1])
+        {
+            int sx = (i % RRC_FLAG_ATLAS_COLS) * RRC_FLAG_W;
+            int sy = (i / RRC_FLAG_ATLAS_COLS) * RRC_FLAG_H;
+            rrc_gfx_blit(&v->canvas, &v->flags, sx, sy, RRC_FLAG_W, RRC_FLAG_H, x, y + (RRC_GFX_FONT_H - RRC_FLAG_H) / 2);
+            return;
+        }
+    }
+
+    rrc_gfx_draw_text(&v->canvas, x, y, country, 1, fallback_color);
 }
 
 static int footer_y(const struct view *v)
@@ -233,7 +260,7 @@ static void show_leaderboard(struct view *v, void *xfb, const struct rrc_tt_trac
                     snprintf(buf, sizeof(buf), "%3d", e->rank);
                     draw_text(v, 0, y, buf, COLOR_DIM);
 
-                    draw_text(v, col_country, y, e->country, COLOR_COUNTRY);
+                    draw_country(v, VIEW_PAD + col_country * RRC_GFX_FONT_W, y, e->country, COLOR_COUNTRY);
 
                     fit(buf, e->player, player_w);
                     draw_text(v, col_player, y, buf, COLOR_SELECTED_TEXT);
@@ -326,6 +353,10 @@ void rrc_leaderboard_view_display(void *xfb, const struct rrc_tt_tracks *tracks)
     if (v.cols > MAX_COLS)
         v.cols = MAX_COLS;
 
+    // Without the flags, country codes are shown as text instead.
+    if (rrc_gfx_image_from_png(&v.flags, flag_atlas) != 0)
+        v.flags.pixels = NULL;
+
     int list_top = VIEW_PAD + ROW_H + 8;
     int visible = visible_rows(&v, list_top);
     int selected = 0;
@@ -392,5 +423,6 @@ void rrc_leaderboard_view_display(void *xfb, const struct rrc_tt_tracks *tracks)
         usleep(RRC_WPAD_LOOP_TIMEOUT);
     }
 
+    rrc_gfx_image_free(&v.flags);
     rrc_gfx_image_free(&v.canvas);
 }

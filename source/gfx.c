@@ -228,6 +228,27 @@ void rrc_gfx_draw_image_rounded(struct rrc_gfx_image *dst, const struct rrc_gfx_
     }
 }
 
+void rrc_gfx_blit(struct rrc_gfx_image *dst, const struct rrc_gfx_image *src, int sx, int sy, int w, int h, int dx, int dy)
+{
+    if (src->pixels == NULL)
+        return;
+
+    for (int y = 0; y < h; y++)
+    {
+        if (sy + y < 0 || sy + y >= src->height)
+            continue;
+
+        for (int x = 0; x < w; x++)
+        {
+            if (sx + x < 0 || sx + x >= src->width)
+                continue;
+
+            u32 s = src->pixels[(sy + y) * src->width + sx + x];
+            put_pixel(dst, dx + x, dy + y, s, CH_A(s));
+        }
+    }
+}
+
 void rrc_gfx_draw_text(struct rrc_gfx_image *dst, int x, int y, const char *text, int scale, u32 color)
 {
     for (; *text; text++, x += RRC_GFX_FONT_W * scale)

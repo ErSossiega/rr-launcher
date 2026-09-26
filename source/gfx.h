@@ -90,6 +90,9 @@ void rrc_gfx_glow_rounded_rect(struct rrc_gfx_image *dst, int x, int y, int w, i
 */
 void rrc_gfx_draw_image_rounded(struct rrc_gfx_image *dst, const struct rrc_gfx_image *src, int x, int y, int w, int h, int radius);
 
+/* Draws the `w' x `h' area of `src' at (`sx', `sy') unscaled at (`dx', `dy'), respecting its alpha. */
+void rrc_gfx_blit(struct rrc_gfx_image *dst, const struct rrc_gfx_image *src, int sx, int sy, int w, int h, int dx, int dy);
+
 /* Draws a single line of text using the console font, magnified by the integer `scale'. */
 void rrc_gfx_draw_text(struct rrc_gfx_image *dst, int x, int y, const char *text, int scale, u32 color);
 
