@@ -191,6 +191,7 @@ struct rrc_result rrc_tt_fetch_leaderboard(int track_id, struct rrc_tt_leaderboa
             continue;
 
         struct rrc_tt_entry *e = &leaderboard->entries[leaderboard->count];
+        e->id = (int)rrc_json_get_number(item, "id", -1);
         e->rank = (int)rrc_json_get_number(item, "rank", leaderboard->count + 1);
         // The Mii name stored in the ghost, rather than the profile name. Wii-only symbols in it
         // are dropped by the conversion, so fall back to the profile if nothing printable is left.

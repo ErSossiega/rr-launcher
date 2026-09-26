@@ -378,7 +378,7 @@ static bool run_updates(struct menu_state *st, void *xfb)
     return false;
 }
 
-/* Time trial leaderboards. Downloading the ghosts themselves (see ghosts/ghosts.h) comes later. */
+/* Time trial leaderboards, from which ghosts can be downloaded to the SD card. */
 static void run_ghosts(struct menu_state *st, void *xfb)
 {
     clear_menu(st, xfb);

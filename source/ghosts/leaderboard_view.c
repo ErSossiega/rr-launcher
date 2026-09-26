@@ -24,9 +24,11 @@
 
 #include "leaderboard_view.h"
 #include "flags_generated.h"
+#include "ghosts.h"
 #include "../gfx.h"
 #include "../gui.h"
 #include "../pad.h"
+#include "../prompt.h"
 #include "../shutdown.h"
 #include "../util.h"
 
@@ -61,10 +63,14 @@
 #define COLOR_GLITCH RRC_GFX_RGBA(255, 140, 80, 255)
 #define COLOR_SHROOMLESS RRC_GFX_RGBA(130, 220, 120, 255)
 #define COLOR_COUNTRY RRC_GFX_RGBA(120, 200, 255, 255)
+#define COLOR_OK RRC_GFX_RGBA(130, 220, 120, 255)
+#define COLOR_ERROR RRC_GFX_RGBA(255, 110, 110, 255)
 
 /* Code page 437 arrows, used as scroll indicators. */
 #define GLYPH_UP "\x18"
 #define GLYPH_DOWN "\x19"
+/* Code page 437 check mark, for ghosts already on the SD card. */
+#define GLYPH_CHECK "\xFB"
 
 struct view
 {
@@ -197,7 +203,21 @@ static int clamp(int v, int lo, int hi)
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
-static void show_leaderboard(struct view *v, void *xfb, const struct rrc_tt_track *track, const struct rrc_tt_leaderboard *lb)
+/* Scrolls `*top' so that row `selected' is one of the `visible' rows shown. */
+static void keep_visible(int selected, int visible, int *top)
+{
+    if (selected < *top)
+        *top = selected;
+    else if (selected >= *top + visible)
+        *top = selected - visible + 1;
+}
+
+/*
+    Shows the leaderboard `lb' of `track'. A downloads the selected ghost into the track's folder, found in
+    `folders' (NULL if the pack has no folder list).
+*/
+static void show_leaderboard(struct view *v, void *xfb, const struct rrc_tt_track *track, const struct rrc_tt_leaderboard *lb,
+                             const struct rrc_ghost_folders *folders)
 {
     int player_w = clamp(v->cols - (COL_RANK_W + COL_COUNTRY_W + COL_CHARACTER_W + COL_VEHICLE_W + COL_TIME_W + COL_FLAGS_W + 6),
                          COL_PLAYER_MIN_W, COL_PLAYER_MAX_W);
@@ -212,11 +232,24 @@ static void show_leaderboard(struct view *v, void *xfb, const struct rrc_tt_trac
     int columns_y = subtitle_y + ROW_H + 4;
     int list_top = columns_y + ROW_H + 6;
     int visible = visible_rows(v, list_top);
-    int max_top = lb->count > visible ? lb->count - visible : 0;
 
+    // Where this track's ghosts go on the SD card. NULL for tracks the pack can't race in time trials
+    // (e.g. variants, which the game always swaps for the main track there).
+    const char *folder = folders != NULL ? rrc_ghost_folders_find(folders, track->name) : NULL;
+
+    bool *downloaded = calloc(lb->count > 0 ? lb->count : 1, sizeof(bool));
+    if (downloaded != NULL && folder != NULL)
+    {
+        for (int i = 0; i < lb->count; i++)
+            downloaded[i] = rrc_ghosts_is_downloaded(folder, lb->entries[i].time);
+    }
+
+    int selected = 0;
     int top = 0;
     int held_ticks = 0;
     bool redraw = true;
+    const char *status = "";
+    u32 status_color = COLOR_DIM;
 
     while (1)
     {
@@ -236,6 +269,7 @@ static void show_leaderboard(struct view *v, void *xfb, const struct rrc_tt_trac
             else
                 snprintf(subtitle, sizeof(subtitle), lb->count == 1 ? "%d time" : "%d times", lb->count);
             draw_text(v, 0, subtitle_y, subtitle, COLOR_DIM);
+            draw_text(v, v->cols - (int)strlen(status), subtitle_y, status, status_color);
 
             if (lb->count == 0)
             {
@@ -257,8 +291,17 @@ static void show_leaderboard(struct view *v, void *xfb, const struct rrc_tt_trac
                     int y = list_top + i * ROW_H;
                     char buf[MAX_COLS + 1];
 
+                    if (top + i == selected)
+                    {
+                        rrc_gfx_fill_rounded_rect(&v->canvas, VIEW_PAD - 4, y - 1, v->canvas.width - 2 * VIEW_PAD + 8, ROW_H, 4,
+                                                  COLOR_SELECTED_BG, COLOR_SELECTED_BG);
+                    }
+
                     snprintf(buf, sizeof(buf), "%3d", e->rank);
                     draw_text(v, 0, y, buf, COLOR_DIM);
+
+                    if (downloaded != NULL && downloaded[top + i])
+                        draw_text(v, COL_RANK_W, y, GLYPH_CHECK, COLOR_OK);
 
                     draw_country(v, VIEW_PAD + col_country * RRC_GFX_FONT_W, y, e->country, COLOR_COUNTRY);
 
@@ -281,7 +324,8 @@ static void show_leaderboard(struct view *v, void *xfb, const struct rrc_tt_trac
                 }
             }
 
-            draw_footer(v, "Up/Down: Scroll   B: Back   G: Glitch  S: Shroomless", top > 0, top < max_top);
+            draw_footer(v, lb->count > 0 ? "A: Download  B: Back  G: Glitch  S: Shroomless  " GLYPH_CHECK ": On SD" : "B: Back",
+                        top > 0, top + visible < lb->count);
             present(v, xfb);
             redraw = false;
         }
@@ -291,22 +335,80 @@ static void show_leaderboard(struct view *v, void *xfb, const struct rrc_tt_trac
         int move = vertical_input(&held_ticks, pressed, held);
 
         if (rrc_pad_b_pressed(pressed) || rrc_pad_home_pressed(pressed))
-            return;
+            break;
 
-        if (rrc_pad_left_pressed(pressed))
-            move = -visible;
-        else if (rrc_pad_right_pressed(pressed))
-            move = visible;
-
-        int new_top = clamp(top + move, 0, max_top);
-        if (new_top != top)
+        if (rrc_pad_a_pressed(pressed) && lb->count > 0)
         {
-            top = new_top;
+            const struct rrc_tt_entry *e = &lb->entries[selected];
+
+            if (folders == NULL)
+            {
+                char *lines[] = {"The pack has no ghost folder list.", "Update the pack to download ghosts."};
+                rrc_prompt_1_option(xfb, lines, 2, "OK");
+            }
+            else if (folder == NULL)
+            {
+                char *lines[] = {"This track can't be raced in Time Trials,", "so its ghosts can't be downloaded."};
+                rrc_prompt_1_option(xfb, lines, 2, "OK");
+            }
+            else if (downloaded != NULL && downloaded[selected])
+            {
+                status = "Already on your SD card.";
+                status_color = COLOR_DIM;
+            }
+            else
+            {
+                char question[64];
+                snprintf(question, sizeof(question), "Download %.20s's ghost (%s)?", e->player, e->time);
+                char *lines[] = {question, "", "It will be saved to your SD card for Time Trials."};
+
+                if (rrc_prompt_yes_no(xfb, lines, 3) == RRC_PROMPT_RESULT_YES)
+                {
+                    // blank the box: the download shows its progress on the console
+                    rrc_gfx_clear(&v->canvas, COLOR_BACKGROUND);
+                    present(v, xfb);
+
+                    struct rrc_result res = rrc_ghosts_download(e->id, folder, e->time);
+                    if (rrc_result_is_error(res))
+                    {
+                        rrc_result_error_check_error_normal(res, xfb);
+                        status = "Download failed.";
+                        status_color = COLOR_ERROR;
+                    }
+                    else
+                    {
+                        if (downloaded != NULL)
+                            downloaded[selected] = true;
+                        status = "Ghost saved!";
+                        status_color = COLOR_OK;
+                    }
+                }
+            }
+
             redraw = true;
+        }
+
+        if (lb->count > 0)
+        {
+            if (rrc_pad_left_pressed(pressed))
+                move = -visible;
+            else if (rrc_pad_right_pressed(pressed))
+                move = visible;
+
+            int new_selected = clamp(selected + move, 0, lb->count - 1);
+            if (new_selected != selected)
+            {
+                selected = new_selected;
+                keep_visible(selected, visible, &top);
+                status = "";
+                redraw = true;
+            }
         }
 
         usleep(RRC_WPAD_LOOP_TIMEOUT);
     }
+
+    free(downloaded);
 }
 
 static void draw_tracks(struct view *v, const struct rrc_tt_tracks *tracks, int selected, int top, int list_top, int visible)
@@ -357,6 +459,13 @@ void rrc_leaderboard_view_display(void *xfb, const struct rrc_tt_tracks *tracks)
     if (rrc_gfx_image_from_png(&v.flags, flag_atlas) != 0)
         v.flags.pixels = NULL;
 
+    // Needed to download ghosts; the leaderboards work without it.
+    struct rrc_ghost_folders folders;
+    struct rrc_result folders_res = rrc_ghost_folders_load(&folders);
+    bool have_folders = !rrc_result_is_error(folders_res);
+    if (!have_folders)
+        rrc_result_free(folders_res);
+
     int list_top = VIEW_PAD + ROW_H + 8;
     int visible = visible_rows(&v, list_top);
     int selected = 0;
@@ -397,7 +506,7 @@ void rrc_leaderboard_view_display(void *xfb, const struct rrc_tt_tracks *tracks)
             }
             else
             {
-                show_leaderboard(&v, xfb, track, &lb);
+                show_leaderboard(&v, xfb, track, &lb, have_folders ? &folders : NULL);
                 rrc_tt_free_leaderboard(&lb);
             }
 
@@ -413,16 +522,15 @@ void rrc_leaderboard_view_display(void *xfb, const struct rrc_tt_tracks *tracks)
         if (new_selected != selected)
         {
             selected = new_selected;
-            if (selected < top)
-                top = selected;
-            else if (selected >= top + visible)
-                top = selected - visible + 1;
+            keep_visible(selected, visible, &top);
             redraw = true;
         }
 
         usleep(RRC_WPAD_LOOP_TIMEOUT);
     }
 
+    if (have_folders)
+        rrc_ghost_folders_free(&folders);
     rrc_gfx_image_free(&v.flags);
     rrc_gfx_image_free(&v.canvas);
 }

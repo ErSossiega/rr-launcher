@@ -49,6 +49,8 @@ struct rrc_tt_tracks
 
 struct rrc_tt_entry
 {
+    /* Submission id, used to download the ghost. */
+    int id;
     int rank;
     /* Mii name stored in the ghost, or the name of the player's time trial profile if it has none. */
     char *player;
