@@ -69,8 +69,6 @@ struct settings_entry
     int option_count;
 };
 
-static char *launch_label = "Launch Game";
-
 static char *save_label = "Save changes";
 static char *changes_saved_status = RRC_CON_ANSI_FG_GREEN "Changes saved." RRC_CON_ANSI_CLR;
 static char *changes_not_saved_status = RRC_CON_ANSI_BG_BRIGHT_RED "Error saving changes." RRC_CON_ANSI_CLR;
@@ -78,10 +76,6 @@ static char *changes_not_saved_status = RRC_CON_ANSI_BG_BRIGHT_RED "Error saving
 static char *my_stuff_label = "My Stuff";
 static char *savegame_label = "Separate savegame";
 static char *autoupdate_label = "Automatic updates";
-
-static char *perform_updates_label = "Perform updates";
-
-static char *manage_channel_installation_label = "Manage channel installation";
 
 static char *exit_label = "Exit Channel";
 
@@ -194,17 +188,14 @@ enum rrc_settings_result rrc_settings_display(void *xfb, struct rrc_settingsfile
     // Begin initializing the settings UI.
     rrc_con_clear(true);
 
+    // Launching, updating and installing the channel are tiles of the main menu, so only settings are here.
     struct settings_entry entries[] = {
-        {.type = ENTRY_TYPE_BUTTON, .label = launch_label},
-        {.type = ENTRY_TYPE_BUTTON, .label = perform_updates_label, .margin_top = 1},
-        {.type = ENTRY_TYPE_BUTTON, .label = manage_channel_installation_label, .margin_top = 1},
         {.type = ENTRY_TYPE_SELECT,
          .label = my_stuff_label,
          .options = my_stuff_options,
          .selected_option = &stored_settings->my_stuff,
          .initial_selected_option = stored_settings->my_stuff,
-         .option_count = my_stuff_options_count,
-         .margin_top = 1},
+         .option_count = my_stuff_options_count},
         {.type = ENTRY_TYPE_SELECT,
          .label = savegame_label,
          .options = savegame_options,
@@ -229,6 +220,9 @@ enum rrc_settings_result rrc_settings_display(void *xfb, struct rrc_settingsfile
     char status_message[64] = "";
     int status_message_row = 0;
     int status_message_col = 0;
+
+    // Console row of the "Save changes" entry, where its status message goes.
+    int save_row = 0;
 
     // Used for padding the label string with spaces so that all options are aligned with each other.
     u32 max_label_len = 0;
@@ -269,6 +263,10 @@ enum rrc_settings_result rrc_settings_display(void *xfb, struct rrc_settingsfile
 
             // add any extra "newlines" (which means just seek)
             row += entry->margin_top;
+            if (entry->label == save_label)
+            {
+                save_row = row;
+            }
             rrc_con_clear_line(row);
             rrc_con_cursor_seek_to(row, 0);
 
@@ -336,7 +334,7 @@ enum rrc_settings_result rrc_settings_display(void *xfb, struct rrc_settingsfile
         printf("%s", status_message);
 
         rrc_con_cursor_seek_to(rrc_con_get_rows() - 2, strlen(cursor_icon));
-        printf("Use the D-Pad to navigate.");
+        printf("Use the D-Pad to navigate. B: Back");
 
         // use an inner loop just for scanning for button presses, rather than re-printing everything all the time
         // because the current scene will remain "static" until a button is pressed
@@ -347,6 +345,16 @@ enum rrc_settings_result rrc_settings_display(void *xfb, struct rrc_settingsfile
             if (rrc_pad_home_pressed(pad))
             {
                 goto exit;
+            }
+            else if (rrc_pad_b_pressed(pad))
+            {
+                if (has_unsaved_changes && prompt_save_unsaved_changes(xfb, entries, entry_count))
+                {
+                    struct rrc_result res = rrc_settingsfile_store(stored_settings);
+                    rrc_result_error_check_error_normal(res, xfb);
+                }
+
+                goto back;
             }
             else if (rrc_pad_down_pressed(pad))
             {
@@ -403,20 +411,10 @@ enum rrc_settings_result rrc_settings_display(void *xfb, struct rrc_settingsfile
 
             if (rrc_pad_a_pressed(pad))
             {
-                if (entry->label == launch_label)
-                {
-                    if (has_unsaved_changes && prompt_save_unsaved_changes(xfb, entries, entry_count))
-                    {
-                        struct rrc_result res = rrc_settingsfile_store(stored_settings);
-                        rrc_result_error_check_error_normal(res, xfb);
-                    }
-
-                    goto launch;
-                }
-                else if (entry->label == save_label)
+                if (entry->label == save_label)
                 {
                     // We'll set a status message in either ok/err case, so set up the position here.
-                    status_message_row = 11;
+                    status_message_row = save_row;
                     status_message_col = strlen(cursor_icon) + strlen(save_label) + 3;
 
                     struct rrc_result res = rrc_settingsfile_store(stored_settings);
@@ -438,53 +436,6 @@ enum rrc_settings_result rrc_settings_display(void *xfb, struct rrc_settingsfile
                     strncpy(status_message, changes_saved_status, sizeof(status_message));
                     break;
                 }
-                else if (entry->label == perform_updates_label)
-                {
-                    int update_count;
-                    bool updated;
-                    struct rrc_result update_res = rrc_update_do_updates(xfb, &update_count, &updated);
-
-                    if (rrc_result_is_error(update_res))
-                    {
-                        rrc_result_error_check_error_normal(update_res, xfb);
-                    }
-                    else
-                    {
-                        if (update_count == 0)
-                        {
-                            strncpy(status_message, RRC_CON_ANSI_FG_BRIGHT_YELLOW "No updates available." RRC_CON_ANSI_CLR, sizeof(status_message));
-                        }
-                        else if (updated)
-                        {
-                            snprintf(status_message, sizeof(status_message), "%d updates were installed.", update_count);
-                            char *lines[] = { status_message, "", "The channel will now exit to apply the updates."};
-                            rrc_prompt_1_option(xfb, lines, 3, "OK");
-                            goto exit;
-                        }
-
-                        status_message_row = 3;
-                        status_message_col = strlen(cursor_icon) + strlen(perform_updates_label) + 3;
-                    }
-
-                    rrc_con_clear(true);
-
-                    break;
-                }
-                else if (entry->label == manage_channel_installation_label)
-                {
-                    char *lines[] = {
-                        "Hey!",
-                        "",
-                        "We didn't make this yet.",
-                        "https://github.com/Retro-Rewind-Team/RR-Launcher/issues/29"};
-
-                    rrc_prompt_1_option(xfb, lines, 4, "Sorry");
-                    strncpy(status_message, RRC_CON_ANSI_FG_BRIGHT_MAGENTA "Oops" RRC_CON_ANSI_CLR, sizeof(status_message));
-                    status_message_row = 5;
-                    status_message_col = strlen(cursor_icon) + strlen(manage_channel_installation_label) + 3;
-
-                    break;
-                }
                 else if (entry->label == exit_label)
                 {
                     if (has_unsaved_changes && prompt_save_unsaved_changes(xfb, entries, entry_count))
@@ -502,11 +453,9 @@ enum rrc_settings_result rrc_settings_display(void *xfb, struct rrc_settingsfile
         usleep(RRC_WPAD_LOOP_TIMEOUT);
     }
 
-    goto launch;
-
-launch:
+back:
     CLEANUP
-    return RRC_SETTINGS_LAUNCH;
+    return RRC_SETTINGS_BACK;
 
 exit:
     CLEANUP

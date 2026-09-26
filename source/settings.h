@@ -27,7 +27,9 @@ enum rrc_settings_result
 {
     RRC_SETTINGS_ERROR = -1,
     RRC_SETTINGS_LAUNCH = 0,
-    RRC_SETTINGS_EXIT = 1
+    RRC_SETTINGS_EXIT = 1,
+    /* Back to the main menu (B). */
+    RRC_SETTINGS_BACK = 2
 };
 
 // TODO: move xfb to some kind of global descriptor

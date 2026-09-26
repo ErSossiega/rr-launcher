@@ -586,6 +586,9 @@ enum rrc_menu_result rrc_menu_display(void *xfb, struct rrc_settingsfile *stored
                 enum rrc_settings_result settings_res = rrc_settings_display(xfb, stored_settings, &r);
                 rrc_result_error_check_error_fatal(r);
 
+                if (settings_res == RRC_SETTINGS_BACK)
+                    break;
+
                 result = settings_res == RRC_SETTINGS_LAUNCH ? RRC_MENU_LAUNCH : RRC_MENU_EXIT;
                 goto out;
             }
