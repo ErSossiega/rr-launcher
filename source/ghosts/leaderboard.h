@@ -72,7 +72,7 @@ struct rrc_tt_leaderboard
     int total;
 };
 
-/* Downloads the tracks that have leaderboards, in the server's display order. */
+/* Downloads the tracks that have leaderboards, sorted alphabetically by name. */
 struct rrc_result rrc_tt_fetch_tracks(struct rrc_tt_tracks *tracks);
 
 void rrc_tt_free_tracks(struct rrc_tt_tracks *tracks);

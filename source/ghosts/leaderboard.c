@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "leaderboard.h"
 #include "../http.h"
@@ -97,6 +98,16 @@ static struct rrc_result fetch_json(const char *url, const char *label, struct r
     return rrc_result_success;
 }
 
+/* Alphabetical, ignoring case; tracks with the same name keep a fixed order by id. */
+static int compare_tracks(const void *a, const void *b)
+{
+    const struct rrc_tt_track *ta = a, *tb = b;
+    int cmp = strcasecmp(ta->name, tb->name);
+    if (cmp != 0)
+        return cmp;
+    return (ta->id > tb->id) - (ta->id < tb->id);
+}
+
 struct rrc_result rrc_tt_fetch_tracks(struct rrc_tt_tracks *tracks)
 {
     tracks->tracks = NULL;
@@ -141,6 +152,7 @@ struct rrc_result rrc_tt_fetch_tracks(struct rrc_tt_tracks *tracks)
     }
 
     rrc_json_free(json);
+    qsort(tracks->tracks, tracks->count, sizeof(*tracks->tracks), compare_tracks);
     return rrc_result_success;
 }
 
